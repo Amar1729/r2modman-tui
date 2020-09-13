@@ -1,3 +1,6 @@
+#![allow(unreachable_code)]
+
+use std::fs;
 use crate::response::{Resp, Package};
 
 extern crate hyper;
@@ -8,6 +11,9 @@ use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 
 pub async fn get_pkgs(url: Uri) -> Vec<Package> {
+    // read from fs while testing
+    return get_pkgs_dbg(url);
+
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
 
@@ -21,4 +27,10 @@ pub async fn get_pkgs(url: Uri) -> Vec<Package> {
         },
         Err(err) => panic!("unhandled: {}", err),
     }
+}
+
+pub fn get_pkgs_dbg(url: Uri) -> Vec<Package> {
+    let body = fs::read_to_string("resp.json").unwrap();
+    let resp: Resp = serde_json::from_str(&body).unwrap();
+    resp.results
 }
