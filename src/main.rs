@@ -1,4 +1,6 @@
-extern crate serde_json;
+mod response;
+
+use response::Resp;
 
 extern crate hyper;
 extern crate hyper_tls;
@@ -6,46 +8,6 @@ extern crate hyper_tls;
 use hyper::body;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-
-use serde::Deserialize;
-
-#[derive(Deserialize, Debug)]
-struct Latest {
-    name: String,
-    full_name: String,
-    description: String,
-    icon: String,
-    version_number: String, // major.minor.rev
-    dependencies: Vec<String>,
-    download_url: String,
-    downloads: u64,
-    date_created: String,
-    website_url: String,
-    is_active: bool,
-}
-
-#[derive(Deserialize, Debug)]
-struct Package {
-    name: String,
-    full_name: String,
-    owner: String,
-    package_url: String,
-    date_created: String,
-    date_updated: String,
-    rating_score: u8,
-    is_pinned: bool,
-    is_deprecated: bool,
-    total_downloads: u64,
-    latest: Latest,
-}
-
-#[derive(Deserialize, Debug)]
-struct Resp {
-    count: u16,
-    next: Option<String>,
-    previous: Option<String>,
-    results: Vec<Package>,
-}
 
 async fn get(url: Uri) -> hyper::Result<String> {
     let https = HttpsConnector::new();
