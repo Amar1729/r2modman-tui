@@ -23,7 +23,7 @@ pub struct Latest {
 pub struct Package {
     pub name: String,
     pub full_name: String,
-    owner: String,
+    pub owner: String,
     package_url: String,
     date_created: String,
     date_updated: String,

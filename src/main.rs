@@ -1,7 +1,7 @@
 mod client;
 mod response;
-
-use client::get_pkgs;
+mod interface;
+mod util;
 
 use hyper::Uri;
 
@@ -11,7 +11,6 @@ async fn main() {
         .parse()
         .unwrap();
 
-    for pkg in get_pkgs(url).await {
-        println!("{}", pkg.full_name);
-    }
+    let pkgs = client::get_pkgs(url).await;
+    interface::start_app(pkgs);
 }
