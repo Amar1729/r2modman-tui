@@ -3,7 +3,7 @@ extern crate serde_json;
 
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Latest {
     name: String,
     full_name: String,
@@ -19,7 +19,7 @@ pub struct Latest {
     is_active: bool,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Package {
     pub name: String,
     pub full_name: String,
