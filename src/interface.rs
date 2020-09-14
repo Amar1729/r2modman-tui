@@ -21,6 +21,7 @@ use tui::{
 };
 
 // in practice, "Downloading" (for showing a bar in tui) is rarely needed
+#[derive(PartialEq)]
 enum PackageState {
     Downloaded,
     Downloading,
@@ -73,19 +74,17 @@ impl<'a> App<'a> {
     }
 
     async fn on_enter(&mut self) {
-        if self.state == AppWindow::Packages {
-            if let Some(i) = self.packages.state.selected() {
-                match self.packages.items[i].1 {
-                    PackageState::Undownloaded => {
-                        let pkg = self.packages.items[i].0.clone();
-                        self.packages.items[i].1 = PackageState::Downloading;
-                        download_pkg(pkg).await;
-                        self.packages.items[i].1 = PackageState::Downloaded;
-                        self.installed_count += 1;
-                    },
-                    _ => {},
-                };
+        match self.packages.state.selected() {
+            Some(i) if self.state == AppWindow::Packages => {
+                if self.packages.items[i].1 == PackageState::Undownloaded {
+                    let pkg = self.packages.items[i].0.clone();
+                    self.packages.items[i].1 = PackageState::Downloading;
+                    download_pkg(pkg).await;
+                    self.packages.items[i].1 = PackageState::Downloaded;
+                    self.installed_count += 1;
+                }
             }
+            Some(_) | None => {}
         }
     }
 }
@@ -221,13 +220,7 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 Key::Char('q') => {
                     break;
                 }
-                Key::Left => {
-                    match app.state {
-                        AppWindow::Packages => app.packages.unselect(),
-                        _ => {},
-                    };
-                }
-                Key::Esc => {
+                Key::Left | Key::Esc => {
                     match app.state {
                         AppWindow::Packages => app.packages.unselect(),
                         _ => {},
