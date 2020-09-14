@@ -24,7 +24,7 @@ pub struct Package {
     pub name: String,
     pub full_name: String,
     pub owner: String,
-    pub package_url: String,
+    package_url: String,
     date_created: String,
     date_updated: String,
     rating_score: u8,
