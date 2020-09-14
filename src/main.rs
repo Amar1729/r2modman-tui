@@ -2,6 +2,7 @@ mod client;
 mod response;
 mod interface;
 mod util;
+mod r2mm;
 
 use hyper::Uri;
 
