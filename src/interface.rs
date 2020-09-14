@@ -132,14 +132,16 @@ fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .highlight_symbol(">> ");
     f.render_stateful_widget(ror2, sidebar[0], &mut app.ror2.state);
 
-    let profiles: Vec<ListItem> = app
-        .profiles
-        .items
-        .iter()
-        .map(|i| {
-            ListItem::new(vec![Spans::from(i.0)])
-        })
-        .collect();
+    // Note - hardcoding this for now, since I'm not sure of the best approach to take to fill out
+    // package counts for installed / online rows.
+    let profiles = vec![
+        ListItem::new(vec![
+            Spans::from(format!("Installed ({})", app.installed_count)),
+        ]),
+        ListItem::new(vec![
+            Spans::from(format!("Online ({})", app.packages.items.len())),
+        ]),
+    ];
     let profiles = List::new(profiles)
         .block(if app.state == AppWindow::Profile {
             block_profiles.border_style(Style::default().fg(Color::Cyan))
