@@ -27,22 +27,34 @@ enum PackageState {
     Undownloaded,
 }
 
+#[derive(PartialEq)]
+enum AppWindow {
+    Ror2,
+    Profile,
+    // TODO - search should be a small window above packages?
+    // Search
+    Packages,
+}
+
 struct App<'a> {
-    options: StatefulList<(&'a str, usize)>,
+    state: AppWindow,
+    ror2: StatefulList<(&'a str, usize)>,
+    profiles: StatefulList<(&'a str, usize)>,
     packages: StatefulList<(Package, PackageState)>,
-    packages_selected: bool,
     installed_count: usize,
 }
 
 impl<'a> App<'a> {
     fn new(pkgs: Vec<Package>) -> App<'a> {
         App {
-            options: StatefulList::with_items(vec![
+            state: AppWindow::Ror2,
+            ror2: StatefulList::with_items(vec![
                 ("Start modded", 1),
-                ("Start vanilla", 2),
-                // these two should actually be "tabs":
+                ("Start vanilla", 1),
+            ]),
+            profiles: StatefulList::with_items(vec![
                 ("Installed", 1),
-                ("Online", 3),
+                ("Online", 1),
                 // ("Config Editor", 4),
                 // ("Settings", 1),
                 // ("Help", 1),
@@ -56,7 +68,6 @@ impl<'a> App<'a> {
                     })
                     .collect()
             ),
-            packages_selected: false,
             installed_count: r2mm::count_pkgs(),
         }
     }
@@ -82,27 +93,36 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
                 .split(f.size());
 
-            let block_left = Block::default()
+            let sidebar = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
+                .split(chunks[0]);
+
+            let block_ror2 = Block::default()
                 .title("Risk of Rain 2")
                 .borders(Borders::ALL);
 
-            let block_right = Block::default()
+            let block_profiles = Block::default()
+                .title("Mods")
+                .borders(Borders::ALL);
+
+            let block_packages = Block::default()
                 .title("Packages")
                 .borders(Borders::ALL);
 
-            let options: Vec<ListItem> = app
-                .options
+            let ror2: Vec<ListItem> = app
+                .ror2
                 .items
                 .iter()
                 .map(|i| {
                     ListItem::new(vec![Spans::from(i.0)])
                 })
                 .collect();
-            let options = List::new(options)
-                .block(if app.packages_selected {
-                    block_left
+            let ror2 = List::new(ror2)
+                .block(if app.state == AppWindow::Ror2 {
+                    block_ror2.border_style(Style::default().fg(Color::Cyan))
                 } else {
-                    block_left.border_style(Style::default().fg(Color::Cyan))
+                    block_ror2
                 })
                 .highlight_style(
                     Style::default()
@@ -110,7 +130,29 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                         .add_modifier(Modifier::BOLD),
                 )
                 .highlight_symbol(">> ");
-            f.render_stateful_widget(options, chunks[0], &mut app.options.state);
+            f.render_stateful_widget(ror2, sidebar[0], &mut app.ror2.state);
+
+            let profiles: Vec<ListItem> = app
+                .profiles
+                .items
+                .iter()
+                .map(|i| {
+                    ListItem::new(vec![Spans::from(i.0)])
+                })
+                .collect();
+            let profiles = List::new(profiles)
+                .block(if app.state == AppWindow::Profile {
+                    block_profiles.border_style(Style::default().fg(Color::Cyan))
+                } else {
+                    block_profiles
+                })
+                .highlight_style(
+                    Style::default()
+                        .bg(Color::LightGreen)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol(">> ");
+            f.render_stateful_widget(profiles, sidebar[1], &mut app.profiles.state);
 
             let pkgs: Vec<ListItem> = app
                 .packages
@@ -120,7 +162,7 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 .map(|(i, (p, state))| {
                     let mut lines = vec![Spans::from(format!("{} by {}", p.name, p.owner))];
 
-                    if app.packages_selected {
+                    if app.state == AppWindow::Packages {
                         if let Some(cur) = app.packages.state.selected() {
                             if cur == i {
                                 let dialog_text = match state {
@@ -140,10 +182,10 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 })
                 .collect();
             let pkg_list = List::new(pkgs)
-                .block(if app.packages_selected {
-                    block_right.border_style(Style::default().fg(Color::Red))
+                .block(if app.state == AppWindow::Packages {
+                    block_packages.border_style(Style::default().fg(Color::Red))
                 } else {
-                    block_right
+                    block_packages
                 })
                 .highlight_style(
                     Style::default()
@@ -160,31 +202,35 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                     break;
                 }
                 Key::Left => {
-                    if app.packages_selected {
-                        app.packages.unselect()
-                    } else {
-                        app.options.unselect();
-                    }
+                    match app.state {
+                        AppWindow::Ror2 => app.ror2.unselect(),
+                        AppWindow::Profile => app.profiles.unselect(),
+                        AppWindow::Packages => app.packages.unselect(),
+                    };
                 }
                 Key::Down => {
-                    if app.packages_selected {
-                        app.packages.next()
-                    } else {
-                        app.options.next();
-                    }
+                    match app.state {
+                        AppWindow::Ror2 => app.ror2.next(),
+                        AppWindow::Profile => app.profiles.next(),
+                        AppWindow::Packages => app.packages.next(),
+                    };
                 }
                 Key::Up => {
-                    if app.packages_selected {
-                        app.packages.previous()
-                    } else {
-                        app.options.previous();
-                    }
+                    match app.state {
+                        AppWindow::Ror2 => app.ror2.previous(),
+                        AppWindow::Profile => app.profiles.previous(),
+                        AppWindow::Packages => app.packages.previous(),
+                    };
                 }
-                Key::Right => {
-                    app.packages_selected ^= true;
+                Key::Char('\t') => {
+                    match app.state {
+                        AppWindow::Ror2 => app.state = AppWindow::Profile,
+                        AppWindow::Profile => app.state = AppWindow::Packages,
+                        AppWindow::Packages => app.state = AppWindow::Ror2,
+                    };
                 }
                 Key::Char('\n') => {
-                    if app.packages_selected {
+                    if app.state == AppWindow::Packages {
                         if let Some(i) = app.packages.state.selected() {
                             match app.packages.items[i].1 {
                                 PackageState::Undownloaded => {
