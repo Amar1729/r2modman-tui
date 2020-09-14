@@ -2,6 +2,7 @@
 
 use crate::response::Package;
 use crate::client::{check_pkg, download_pkg};
+use crate::r2mm;
 
 use crate::util::{
     event::{Event, Events},
@@ -30,6 +31,7 @@ struct App<'a> {
     options: StatefulList<(&'a str, usize)>,
     packages: StatefulList<(Package, PackageState)>,
     packages_selected: bool,
+    installed_count: usize,
 }
 
 impl<'a> App<'a> {
@@ -55,6 +57,7 @@ impl<'a> App<'a> {
                     .collect()
             ),
             packages_selected: false,
+            installed_count: r2mm::count_pkgs(),
         }
     }
 }
@@ -189,6 +192,7 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                                     app.packages.items[i].1 = PackageState::Downloading;
                                     download_pkg(pkg).await;
                                     app.packages.items[i].1 = PackageState::Downloaded;
+                                    app.installed_count += 1;
                                 },
                                 _ => {},
                             };
