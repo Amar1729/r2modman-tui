@@ -12,5 +12,5 @@ async fn main() {
         .unwrap();
 
     let pkgs = client::get_pkgs(url).await;
-    interface::start_app(pkgs);
+    interface::start_app(pkgs).await;
 }

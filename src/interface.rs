@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::response::Package;
+use crate::client::{check_pkg, download_pkg};
 
 use crate::util::{
     event::{Event, Events},
@@ -18,9 +19,16 @@ use tui::{
     Terminal,
 };
 
+// in practice, "Downloading" (for showing a bar in tui) is rarely needed
+enum PackageState {
+    Downloaded,
+    Downloading,
+    Undownloaded,
+}
+
 struct App<'a> {
     options: StatefulList<(&'a str, usize)>,
-    packages: StatefulList<Package>,
+    packages: StatefulList<(Package, PackageState)>,
     packages_selected: bool,
 }
 
@@ -37,13 +45,21 @@ impl<'a> App<'a> {
                 // ("Settings", 1),
                 // ("Help", 1),
             ]),
-            packages: StatefulList::with_items(pkgs),
+            packages: StatefulList::with_items(
+                pkgs
+                    .iter()
+                    .map(|p| {
+                        let s = if check_pkg(p.clone()) { PackageState::Downloaded } else { PackageState::Undownloaded };
+                        (p.clone(), s)
+                    })
+                    .collect()
+            ),
             packages_selected: false,
         }
     }
 }
 
-pub fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
+pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
     // Terminal initialization
     let stdout = io::stdout().into_raw_mode()?;
     let stdout = MouseTerminal::from(stdout);
@@ -97,10 +113,27 @@ pub fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 .packages
                 .items
                 .iter()
-                .map(|p| {
-                    ListItem::new(vec![
-                        Spans::from(format!("{} by {}", p.name, p.owner))
-                    ])
+                .enumerate()
+                .map(|(i, (p, state))| {
+                    let mut lines = vec![Spans::from(format!("{} by {}", p.name, p.owner))];
+
+                    if app.packages_selected {
+                        if let Some(cur) = app.packages.state.selected() {
+                            if cur == i {
+                                let dialog_text = match state {
+                                    PackageState::Downloaded => "> Downloaded <",
+                                    PackageState::Downloading => "...",
+                                    PackageState::Undownloaded => "Download? [enter]",
+                                };
+                                lines.push(Spans::from(Span::styled(
+                                    dialog_text,
+                                    Style::default().add_modifier(Modifier::BOLD),
+                                )));
+                            }
+                        }
+                    }
+
+                    ListItem::new(lines)
                 })
                 .collect();
             let pkg_list = List::new(pkgs)
@@ -146,6 +179,21 @@ pub fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 }
                 Key::Right => {
                     app.packages_selected ^= true;
+                }
+                Key::Char('\n') => {
+                    if app.packages_selected {
+                        if let Some(i) = app.packages.state.selected() {
+                            match app.packages.items[i].1 {
+                                PackageState::Undownloaded => {
+                                    let pkg = app.packages.items[i].0.clone();
+                                    app.packages.items[i].1 = PackageState::Downloading;
+                                    download_pkg(pkg).await;
+                                    app.packages.items[i].1 = PackageState::Downloaded;
+                                },
+                                _ => {},
+                            };
+                        }
+                    }
                 }
                 _ => {}
             },

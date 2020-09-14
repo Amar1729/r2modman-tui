@@ -38,6 +38,13 @@ pub fn get_pkgs_dbg(url: Uri) -> Vec<Package> {
     resp.results
 }
 
+pub fn check_pkg(pkg: Package) -> bool {
+    let dl_dir = path::Path::new("/tmp/mods");
+    let zipfile = format!("{}.zip", pkg.latest.full_name);
+
+    return dl_dir.join(zipfile).exists();
+}
+
 /// Downloads a package to /tmp/mods
 /// TODO - download deps as well
 /// TODO - specify the path in a config file
