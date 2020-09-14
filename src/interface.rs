@@ -71,6 +71,23 @@ impl<'a> App<'a> {
             installed_count: r2mm::count_pkgs(),
         }
     }
+
+    async fn on_enter(&mut self) {
+        if self.state == AppWindow::Packages {
+            if let Some(i) = self.packages.state.selected() {
+                match self.packages.items[i].1 {
+                    PackageState::Undownloaded => {
+                        let pkg = self.packages.items[i].0.clone();
+                        self.packages.items[i].1 = PackageState::Downloading;
+                        download_pkg(pkg).await;
+                        self.packages.items[i].1 = PackageState::Downloaded;
+                        self.installed_count += 1;
+                    },
+                    _ => {},
+                };
+            }
+        }
+    }
 }
 
 fn create_block(title: &str) -> Block {
@@ -238,20 +255,7 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                     };
                 }
                 Key::Char('\n') => {
-                    if app.state == AppWindow::Packages {
-                        if let Some(i) = app.packages.state.selected() {
-                            match app.packages.items[i].1 {
-                                PackageState::Undownloaded => {
-                                    let pkg = app.packages.items[i].0.clone();
-                                    app.packages.items[i].1 = PackageState::Downloading;
-                                    download_pkg(pkg).await;
-                                    app.packages.items[i].1 = PackageState::Downloaded;
-                                    app.installed_count += 1;
-                                },
-                                _ => {},
-                            };
-                        }
-                    }
+                    app.on_enter().await;
                 }
                 _ => {}
             },
