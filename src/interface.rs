@@ -12,12 +12,12 @@ use crate::util::{
 use std::{error::Error, io};
 use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
 use tui::{
-    backend::TermionBackend,
+    backend::{Backend, TermionBackend},
     layout::{Constraint, Corner, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
     widgets::{Block, Borders, List, ListItem},
-    Terminal,
+    Frame, Terminal,
 };
 
 // in practice, "Downloading" (for showing a bar in tui) is rarely needed
@@ -73,6 +73,113 @@ impl<'a> App<'a> {
     }
 }
 
+fn create_block(title: &str) -> Block {
+    Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+}
+
+fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
+        .split(f.size());
+
+    let sidebar = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
+        .split(chunks[0]);
+
+    let block_ror2 = create_block("Risk of Rain2");
+    let block_profiles = create_block("Mods");
+    let block_packages = create_block("Packages");
+
+    let ror2: Vec<ListItem> = app
+        .ror2
+        .items
+        .iter()
+        .map(|i| {
+            ListItem::new(vec![Spans::from(i.0)])
+        })
+        .collect();
+    let ror2 = List::new(ror2)
+        .block(if app.state == AppWindow::Ror2 {
+            block_ror2.border_style(Style::default().fg(Color::Cyan))
+        } else {
+            block_ror2
+        })
+        .highlight_style(
+            Style::default()
+                .bg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(ror2, sidebar[0], &mut app.ror2.state);
+
+    let profiles: Vec<ListItem> = app
+        .profiles
+        .items
+        .iter()
+        .map(|i| {
+            ListItem::new(vec![Spans::from(i.0)])
+        })
+        .collect();
+    let profiles = List::new(profiles)
+        .block(if app.state == AppWindow::Profile {
+            block_profiles.border_style(Style::default().fg(Color::Cyan))
+        } else {
+            block_profiles
+        })
+        .highlight_style(
+            Style::default()
+                .bg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(profiles, sidebar[1], &mut app.profiles.state);
+
+    let pkgs: Vec<ListItem> = app
+        .packages
+        .items
+        .iter()
+        .enumerate()
+        .map(|(i, (p, state))| {
+            let mut lines = vec![Spans::from(format!("{} by {}", p.name, p.owner))];
+
+            if app.state == AppWindow::Packages {
+                if let Some(cur) = app.packages.state.selected() {
+                    if cur == i {
+                        let dialog_text = match state {
+                            PackageState::Downloaded => "> Downloaded <",
+                            PackageState::Downloading => "...",
+                            PackageState::Undownloaded => "Download? [enter]",
+                        };
+                        lines.push(Spans::from(Span::styled(
+                            dialog_text,
+                            Style::default().add_modifier(Modifier::BOLD),
+                        )));
+                    }
+                }
+            }
+
+            ListItem::new(lines)
+        })
+        .collect();
+    let pkg_list = List::new(pkgs)
+        .block(if app.state == AppWindow::Packages {
+            block_packages.border_style(Style::default().fg(Color::Red))
+        } else {
+            block_packages
+        })
+        .highlight_style(
+            Style::default()
+                .bg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(pkg_list, chunks[1], &mut app.packages.state);
+}
+
 pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
     // Terminal initialization
     let stdout = io::stdout().into_raw_mode()?;
@@ -86,115 +193,11 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
     // App
     let mut app = App::new(pkgs);
 
+    app.ror2.next();
+    app.profiles.next();
+
     loop {
-        terminal.draw(|f| {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
-                .split(f.size());
-
-            let sidebar = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
-                .split(chunks[0]);
-
-            let block_ror2 = Block::default()
-                .title("Risk of Rain 2")
-                .borders(Borders::ALL);
-
-            let block_profiles = Block::default()
-                .title("Mods")
-                .borders(Borders::ALL);
-
-            let block_packages = Block::default()
-                .title("Packages")
-                .borders(Borders::ALL);
-
-            let ror2: Vec<ListItem> = app
-                .ror2
-                .items
-                .iter()
-                .map(|i| {
-                    ListItem::new(vec![Spans::from(i.0)])
-                })
-                .collect();
-            let ror2 = List::new(ror2)
-                .block(if app.state == AppWindow::Ror2 {
-                    block_ror2.border_style(Style::default().fg(Color::Cyan))
-                } else {
-                    block_ror2
-                })
-                .highlight_style(
-                    Style::default()
-                        .bg(Color::LightGreen)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol(">> ");
-            f.render_stateful_widget(ror2, sidebar[0], &mut app.ror2.state);
-
-            let profiles: Vec<ListItem> = app
-                .profiles
-                .items
-                .iter()
-                .map(|i| {
-                    ListItem::new(vec![Spans::from(i.0)])
-                })
-                .collect();
-            let profiles = List::new(profiles)
-                .block(if app.state == AppWindow::Profile {
-                    block_profiles.border_style(Style::default().fg(Color::Cyan))
-                } else {
-                    block_profiles
-                })
-                .highlight_style(
-                    Style::default()
-                        .bg(Color::LightGreen)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol(">> ");
-            f.render_stateful_widget(profiles, sidebar[1], &mut app.profiles.state);
-
-            let pkgs: Vec<ListItem> = app
-                .packages
-                .items
-                .iter()
-                .enumerate()
-                .map(|(i, (p, state))| {
-                    let mut lines = vec![Spans::from(format!("{} by {}", p.name, p.owner))];
-
-                    if app.state == AppWindow::Packages {
-                        if let Some(cur) = app.packages.state.selected() {
-                            if cur == i {
-                                let dialog_text = match state {
-                                    PackageState::Downloaded => "> Downloaded <",
-                                    PackageState::Downloading => "...",
-                                    PackageState::Undownloaded => "Download? [enter]",
-                                };
-                                lines.push(Spans::from(Span::styled(
-                                    dialog_text,
-                                    Style::default().add_modifier(Modifier::BOLD),
-                                )));
-                            }
-                        }
-                    }
-
-                    ListItem::new(lines)
-                })
-                .collect();
-            let pkg_list = List::new(pkgs)
-                .block(if app.state == AppWindow::Packages {
-                    block_packages.border_style(Style::default().fg(Color::Red))
-                } else {
-                    block_packages
-                })
-                .highlight_style(
-                    Style::default()
-                        .bg(Color::LightGreen)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol(">> ");
-            f.render_stateful_widget(pkg_list, chunks[1], &mut app.packages.state);
-        })?;
+        terminal.draw(|f| {draw(f, &mut app)})?;
 
         match events.next()? {
             Event::Input(input) => match input {
@@ -203,9 +206,14 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 }
                 Key::Left => {
                     match app.state {
-                        AppWindow::Ror2 => app.ror2.unselect(),
-                        AppWindow::Profile => app.profiles.unselect(),
                         AppWindow::Packages => app.packages.unselect(),
+                        _ => {},
+                    };
+                }
+                Key::Esc => {
+                    match app.state {
+                        AppWindow::Packages => app.packages.unselect(),
+                        _ => {},
                     };
                 }
                 Key::Down => {
