@@ -1,6 +1,9 @@
 #![allow(unreachable_code)]
 
 use std::fs;
+use std::path;
+use std::io;
+
 use crate::response::{Resp, Package};
 
 extern crate hyper;
@@ -34,3 +37,34 @@ pub fn get_pkgs_dbg(url: Uri) -> Vec<Package> {
     let resp: Resp = serde_json::from_str(&body).unwrap();
     resp.results
 }
+
+/// Downloads a package to /tmp/mods
+/// TODO - download deps as well
+/// TODO - specify the path in a config file
+/// TODO - turn this into a general Downloader with methods
+/// TODO - a Downloader would use one Client to take advantage of advantage caching
+pub async fn download_pkg(pkg: Package) -> Result<(), &'static str> {
+    let dl_dir = path::Path::new("/tmp/mods");
+
+    let zipfile = format!("{}.zip", pkg.latest.full_name);
+    let mut zipfile = fs::File::create(dl_dir.join(zipfile)).unwrap();
+    let download_url = pkg.latest.download_url;
+
+    /*
+    let deps = pkg.latest.dependencies
+        .iter()
+        .map(|dep_name| {})
+        .collect();
+    */
+
+    // let client = reqwest::Client::new();
+    let response = reqwest::get(&download_url).await.unwrap();
+
+    let content = response.bytes().await.unwrap();
+    io::copy(&mut content.as_ref(), &mut zipfile);
+
+    Ok(())
+}
+
+// async fn download(url: Uri, pth: String) -> Result<(), &'static str> {
+// }
