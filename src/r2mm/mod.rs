@@ -8,20 +8,61 @@ use zip::{ZipArchive, result::ZipResult};
 
 use hyper;
 
+use serde::Deserialize;
+use serde_json;
+
+use unicode_bom::Bom;
+
 use crate::response::Package;
 
 // hard coded for now
 // eventually, will use a Config and xdg config
 const DIR: &'static str = "/tmp/mods";
 
+/// manifest.json for a plugin
+#[derive(Deserialize, Debug)]
+pub struct Manifest {
+    name: String,
+    /// major.minor.rev:
+    version_number: String,
+    website_url: String,
+    description: String,
+    dependencies: Vec<String>,
+}
+
 pub fn check_pkg(pkg: Package) -> bool {
     let dl_dir = path::Path::new(DIR);
     return dl_dir.join(pkg.latest.full_name).exists();
 }
 
-pub fn count_pkgs() -> usize {
+pub fn count_pkgs() -> io::Result<usize> {
     let dl_dir = path::Path::new(DIR);
-    fs::read_dir(dl_dir).unwrap().count()
+    match fs::read_dir(dl_dir) {
+        Ok(files) => {
+            let mut count = 0;
+            for plugin in files {
+                let p = plugin?.path();
+                if path::Path::new(&p).is_dir() {
+                    let file = path::Path::new(&p).join("manifest.json");
+
+                    if let Ok(bom) = file.to_str().unwrap().parse::<Bom>() {
+                        let mut content = fs::read_to_string(file)?;
+                        content.drain(..bom.len());
+
+                        match serde_json::from_str::<Manifest>(&content) {
+                            Ok(_) => {
+                                count += 1;
+                            }
+                            Err(e) => { eprintln!("err: {}", e); }
+                        }
+                    }
+                }
+            }
+
+            Ok(count)
+        }
+        Err(_) => { Ok(0) }
+    }
 }
 
 /// Unzips a zip package contained in 'content' to a directory specified by 'name'

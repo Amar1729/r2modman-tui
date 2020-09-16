@@ -69,7 +69,7 @@ impl<'a> App<'a> {
                     })
                     .collect()
             ),
-            installed_count: r2mm::count_pkgs(),
+            installed_count: r2mm::count_pkgs().unwrap(),
         }
     }
 

@@ -4,6 +4,9 @@ mod interface;
 mod util;
 mod r2mm;
 
+extern crate serde;
+extern crate serde_json;
+
 use hyper::Uri;
 
 #[tokio::main]
