@@ -1,3 +1,5 @@
+//! Commandline Mod Manager for Risk of Rain 2 video game.
+
 mod client;
 mod response;
 mod interface;
@@ -6,6 +8,9 @@ mod r2mm;
 
 extern crate serde;
 extern crate serde_json;
+
+extern crate hyper;
+extern crate hyper_tls;
 
 use hyper::Uri;
 

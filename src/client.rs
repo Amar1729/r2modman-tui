@@ -2,13 +2,9 @@
 
 use std::fs;
 use std::path;
-use std::io;
 
 use crate::response::{Resp, Package};
 use crate::r2mm;
-
-extern crate hyper;
-extern crate hyper_tls;
 
 use hyper::body;
 use hyper::{Client, Uri};
