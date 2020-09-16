@@ -79,9 +79,13 @@ impl<'a> App<'a> {
                 if self.packages.items[i].1 == PackageState::Undownloaded {
                     let pkg = self.packages.items[i].0.clone();
                     self.packages.items[i].1 = PackageState::Downloading;
-                    download_pkg(pkg).await;
-                    self.packages.items[i].1 = PackageState::Downloaded;
-                    self.installed_count += 1;
+                    match download_pkg(pkg, self.packages.items.iter().map(|(p,i)| {p.clone()}).collect()).await {
+                        Ok(_) => {
+                            self.packages.items[i].1 = PackageState::Downloaded;
+                            self.installed_count += 1;
+                        }
+                        _ => {}
+                    }
                 }
             }
             Some(_) | None => {}

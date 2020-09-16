@@ -44,22 +44,36 @@ pub fn get_pkgs_dbg(url: Uri) -> Vec<Package> {
 /// TODO - specify the path in a config file
 /// TODO - turn this into a general Downloader with methods
 /// TODO - a Downloader would use one Client to take advantage of advantage caching
-pub async fn download_pkg(pkg: Package) -> Result<(), &'static str> {
-    let download_url = pkg.latest.download_url;
-
-    /*
-    let deps = pkg.latest.dependencies
-        .iter()
-        .map(|dep_name| {})
-        .collect();
-    */
-
+pub async fn download_pkg(pkg: Package, pkgs: Vec<Package>) -> Result<(), &'static str> {
     // let client = reqwest::Client::new();
-    let response = reqwest::get(&download_url).await.unwrap();
+
+    match download(pkg.clone()).await {
+        Ok(_) => {
+            // download deps
+            for dep in pkg.latest.dependencies {
+                if let Some(p) = &pkgs.iter().find(|&p| {dep.starts_with(&p.full_name)}) {
+                    // this should be recursive if nested deps of packages are not listed?
+                    // recursion in async fn will require boxing
+                    match download((**p).clone()).await {
+                        Ok(_) => {}
+                        _ => {}
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+async fn download(pkg: Package) -> Result<(), &'static str> {
+    let response = reqwest::get(&pkg.latest.download_url).await.unwrap();
 
     match response.bytes().await {
         Ok(bytes) => {
             match r2mm::unzip_pkg(pkg.latest.full_name, bytes) {
+                // gross
                 Ok(_) => {}
                 Err(_) => {}
             }
@@ -69,6 +83,3 @@ pub async fn download_pkg(pkg: Package) -> Result<(), &'static str> {
 
     Ok(())
 }
-
-// async fn download(url: Uri, pth: String) -> Result<(), &'static str> {
-// }
