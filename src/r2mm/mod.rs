@@ -8,15 +8,26 @@ use zip::{ZipArchive, result::ZipResult};
 
 use hyper;
 
-pub fn count_pkgs() -> usize {
-    let dl_dir = path::Path::new("/tmp/mods");
+use crate::response::Package;
 
+// hard coded for now
+// eventually, will use a Config and xdg config
+const DIR: &'static str = "/tmp/mods";
+
+pub fn check_pkg(pkg: Package) -> bool {
+    let dl_dir = path::Path::new(DIR);
+    return dl_dir.join(pkg.latest.full_name).exists();
+}
+
+pub fn count_pkgs() -> usize {
+    let dl_dir = path::Path::new(DIR);
     fs::read_dir(dl_dir).unwrap().count()
 }
 
 /// Unzips a zip package contained in 'content' to a directory specified by 'name'
+#[allow(deprecated)]
 pub fn unzip_pkg(name: String, content: hyper::body::Bytes) -> ZipResult<()> {
-    let directory = path::Path::new("/tmp/mods").join(name);
+    let directory = path::Path::new(DIR).join(name);
 
     let reader = io::Cursor::new(content);
     let mut zip = ZipArchive::new(reader).unwrap();

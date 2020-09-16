@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::response::Package;
-use crate::client::{check_pkg, download_pkg};
+use crate::client::download_pkg;
 use crate::r2mm;
 
 use crate::util::{
@@ -64,7 +64,7 @@ impl<'a> App<'a> {
                 pkgs
                     .iter()
                     .map(|p| {
-                        let s = if check_pkg(p.clone()) { PackageState::Downloaded } else { PackageState::Undownloaded };
+                        let s = if r2mm::check_pkg(p.clone()) { PackageState::Downloaded } else { PackageState::Undownloaded };
                         (p.clone(), s)
                     })
                     .collect()
