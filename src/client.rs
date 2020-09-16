@@ -5,6 +5,7 @@ use std::path;
 use std::io;
 
 use crate::response::{Resp, Package};
+use crate::r2mm;
 
 extern crate hyper;
 extern crate hyper_tls;
@@ -51,10 +52,6 @@ pub fn check_pkg(pkg: Package) -> bool {
 /// TODO - turn this into a general Downloader with methods
 /// TODO - a Downloader would use one Client to take advantage of advantage caching
 pub async fn download_pkg(pkg: Package) -> Result<(), &'static str> {
-    let dl_dir = path::Path::new("/tmp/mods");
-
-    let zipfile = format!("{}.zip", pkg.latest.full_name);
-    let mut zipfile = fs::File::create(dl_dir.join(zipfile)).unwrap();
     let download_url = pkg.latest.download_url;
 
     /*
@@ -67,8 +64,15 @@ pub async fn download_pkg(pkg: Package) -> Result<(), &'static str> {
     // let client = reqwest::Client::new();
     let response = reqwest::get(&download_url).await.unwrap();
 
-    let content = response.bytes().await.unwrap();
-    io::copy(&mut content.as_ref(), &mut zipfile);
+    match response.bytes().await {
+        Ok(bytes) => {
+            match r2mm::unzip_pkg(pkg.latest.full_name, bytes) {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+        Err(_) => {}
+    }
 
     Ok(())
 }
