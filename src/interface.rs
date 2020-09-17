@@ -39,16 +39,21 @@ enum AppWindow {
 
 struct App<'a> {
     state: AppWindow,
+    packages: Vec<Package>,
+    downloaded: Vec<r2mm::Manifest>,
     ror2: StatefulList<(&'a str, usize)>,
     profiles: StatefulList<(&'a str, usize)>,
-    packages: StatefulList<(Package, PackageState)>,
-    installed_count: usize,
+    filtered: StatefulList<(Package, PackageState)>,
 }
 
 impl<'a> App<'a> {
     fn new(pkgs: Vec<Package>) -> App<'a> {
+        // on entry, display the "Installed" package list
+        let downloaded = r2mm::get_local_pkgs().unwrap();
         App {
             state: AppWindow::Ror2,
+            packages: pkgs.clone(),
+            downloaded: downloaded.clone(),
             ror2: StatefulList::with_items(vec![
                 ("Start modded", 1),
                 ("Start vanilla", 1),
@@ -60,29 +65,30 @@ impl<'a> App<'a> {
                 // ("Settings", 1),
                 // ("Help", 1),
             ]),
-            packages: StatefulList::with_items(
-                pkgs
+            // initially, filtered can hold list of installed pkgs
+            filtered: StatefulList::with_items(
+                downloaded
                     .iter()
-                    .map(|p| {
-                        let s = if r2mm::check_pkg(p.clone()) { PackageState::Downloaded } else { PackageState::Undownloaded };
-                        (p.clone(), s)
+                    .filter_map(|m| {
+                        // let s = if r2mm::check_pkg(p.clone()) { PackageState::Downloaded } else { PackageState::Undownloaded };
+                        r2mm::pkg_from_manifest(m.clone(), pkgs.clone())
                     })
+                    .map(|m| { (m.clone(), PackageState::Downloaded) })
                     .collect()
             ),
-            installed_count: r2mm::count_pkgs().unwrap(),
         }
     }
 
     async fn on_enter(&mut self) {
-        match self.packages.state.selected() {
+        match self.filtered.state.selected() {
             Some(i) if self.state == AppWindow::Packages => {
-                if self.packages.items[i].1 == PackageState::Undownloaded {
-                    let pkg = self.packages.items[i].0.clone();
-                    self.packages.items[i].1 = PackageState::Downloading;
-                    match download_pkg(pkg, self.packages.items.iter().map(|(p,i)| {p.clone()}).collect()).await {
+                if self.filtered.items[i].1 == PackageState::Undownloaded {
+                    let pkg = self.filtered.items[i].0.clone();
+                    self.filtered.items[i].1 = PackageState::Downloading;
+                    match download_pkg(pkg, self.filtered.items.iter().map(|(p,_)| {p.clone()}).collect()).await {
                         Ok(_) => {
-                            self.packages.items[i].1 = PackageState::Downloaded;
-                            self.installed_count += 1;
+                            self.filtered.items[i].1 = PackageState::Downloaded;
+                            // self.downloaded.push();
                         }
                         _ => {}
                     }
@@ -140,10 +146,10 @@ fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     // package counts for installed / online rows.
     let profiles = vec![
         ListItem::new(vec![
-            Spans::from(format!("Installed ({})", app.installed_count)),
+            Spans::from(format!("Installed ({})", app.downloaded.len())),
         ]),
         ListItem::new(vec![
-            Spans::from(format!("Online ({})", app.packages.items.len())),
+            Spans::from(format!("Online ({})", app.packages.len())),
         ]),
     ];
     let profiles = List::new(profiles)
@@ -161,7 +167,7 @@ fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_stateful_widget(profiles, sidebar[1], &mut app.profiles.state);
 
     let pkgs: Vec<ListItem> = app
-        .packages
+        .filtered
         .items
         .iter()
         .enumerate()
@@ -169,7 +175,7 @@ fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             let mut lines = vec![Spans::from(format!("{} by {}", p.name, p.owner))];
 
             if app.state == AppWindow::Packages {
-                if let Some(cur) = app.packages.state.selected() {
+                if let Some(cur) = app.filtered.state.selected() {
                     if cur == i {
                         let dialog_text = match state {
                             PackageState::Downloaded => "> Downloaded <",
@@ -199,7 +205,7 @@ fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");
-    f.render_stateful_widget(pkg_list, chunks[1], &mut app.packages.state);
+    f.render_stateful_widget(pkg_list, chunks[1], &mut app.filtered.state);
 }
 
 pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
@@ -228,7 +234,7 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                 }
                 Key::Left | Key::Esc => {
                     match app.state {
-                        AppWindow::Packages => app.packages.unselect(),
+                        AppWindow::Packages => app.filtered.unselect(),
                         _ => {},
                     };
                 }
@@ -236,14 +242,14 @@ pub async fn start_app(pkgs: Vec<Package>) -> Result<(), Box<dyn Error>> {
                     match app.state {
                         AppWindow::Ror2 => app.ror2.next(),
                         AppWindow::Profile => app.profiles.next(),
-                        AppWindow::Packages => app.packages.next(),
+                        AppWindow::Packages => app.filtered.next(),
                     };
                 }
                 Key::Up => {
                     match app.state {
                         AppWindow::Ror2 => app.ror2.previous(),
                         AppWindow::Profile => app.profiles.previous(),
-                        AppWindow::Packages => app.packages.previous(),
+                        AppWindow::Packages => app.filtered.previous(),
                     };
                 }
                 Key::Char('\t') => {

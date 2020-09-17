@@ -20,9 +20,9 @@ use crate::response::Package;
 const DIR: &'static str = "/tmp/mods";
 
 /// manifest.json for a plugin
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Manifest {
-    name: String,
+    pub name: String,
     /// major.minor.rev:
     version_number: String,
     website_url: String,
@@ -35,11 +35,23 @@ pub fn check_pkg(pkg: Package) -> bool {
     return dl_dir.join(pkg.latest.full_name).exists();
 }
 
-pub fn count_pkgs() -> io::Result<usize> {
+/// Gives a Package matching the given Manifest's name.
+pub fn pkg_from_manifest(m: Manifest, pkgs: Vec<Package>) -> Option<Package> {
+    if let Some(pkg) = pkgs.iter().find(|p| {p.name == m.name}) {
+        Some(pkg.clone())
+    } else {
+        None
+    }
+}
+
+// pub fn manifest_from_pkg(p: Package) -> Option<Manifest> {
+// }
+
+pub fn get_local_pkgs() -> io::Result<Vec<Manifest>> {
     let dl_dir = path::Path::new(DIR);
     match fs::read_dir(dl_dir) {
         Ok(files) => {
-            let mut count = 0;
+            let mut pkgs: Vec<Manifest> = vec![];
             for plugin in files {
                 let p = plugin?.path();
                 if path::Path::new(&p).is_dir() {
@@ -50,8 +62,8 @@ pub fn count_pkgs() -> io::Result<usize> {
                         content.drain(..bom.len());
 
                         match serde_json::from_str::<Manifest>(&content) {
-                            Ok(_) => {
-                                count += 1;
+                            Ok(m) => {
+                                pkgs.push(m);
                             }
                             Err(e) => { eprintln!("err: {}", e); }
                         }
@@ -59,9 +71,9 @@ pub fn count_pkgs() -> io::Result<usize> {
                 }
             }
 
-            Ok(count)
+            Ok(pkgs)
         }
-        Err(_) => { Ok(0) }
+        Err(_) => { Ok(vec![]) }
     }
 }
 
