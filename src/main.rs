@@ -21,5 +21,10 @@ async fn main() {
         .unwrap();
 
     let pkgs = client::get_pkgs(url).await;
-    interface::start_app(pkgs).await;
+    // interface::start_app(pkgs).await;
+    r2mm::launcher::launch_game(false);
+    // let pkg = pkgs[1].clone();
+    // client::download_pkg(pkg, pkgs).await;
+
+    // println!("result: {}", r2mm::get_local_pkgs().unwrap().len());
 }

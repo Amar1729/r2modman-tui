@@ -1,5 +1,7 @@
 /// Module for file management of the ror2 mods.
 
+pub mod launcher;
+
 use std::fs;
 use std::io;
 use std::path;

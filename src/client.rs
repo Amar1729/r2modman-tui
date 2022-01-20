@@ -1,7 +1,6 @@
 #![allow(unreachable_code)]
 
 use std::fs;
-use std::path;
 
 use crate::response::{Resp, Package};
 use crate::r2mm;

@@ -80,21 +80,31 @@ impl<'a> App<'a> {
     }
 
     async fn on_enter(&mut self) {
-        match self.filtered.state.selected() {
-            Some(i) if self.state == AppWindow::Packages => {
-                if self.filtered.items[i].1 == PackageState::Undownloaded {
-                    let pkg = self.filtered.items[i].0.clone();
-                    self.filtered.items[i].1 = PackageState::Downloading;
-                    match download_pkg(pkg, self.filtered.items.iter().map(|(p,_)| {p.clone()}).collect()).await {
-                        Ok(_) => {
-                            self.filtered.items[i].1 = PackageState::Downloaded;
-                            // self.downloaded.push();
+        match self.state {
+            AppWindow::Packages => {
+                if let Some(i) = self.filtered.state.selected() {
+                    if self.filtered.items[i].1 == PackageState::Undownloaded {
+                        let pkg = self.filtered.items[i].0.clone();
+                        self.filtered.items[i].1 = PackageState::Downloading;
+                        match download_pkg(pkg, self.filtered.items.iter().map(|(p,_)| {p.clone()}).collect()).await {
+                            Ok(_) => {
+                                self.filtered.items[i].1 = PackageState::Downloaded;
+                                // self.downloaded.push();
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }
-            Some(_) | None => {}
+            AppWindow::Ror2 => {
+                println!("hello");
+                match self.profiles.state.selected() {
+                    Some(0) => { r2mm::launcher::launch_game(true); }
+                    Some(1) => { r2mm::launcher::launch_game(false); }
+                    _ => panic!("nope"),
+                }
+            }
+            _ => {}
         }
     }
 }
